@@ -13,25 +13,34 @@ a{color:var(--accent)}code{background:var(--code);padding:.1em .3em;border-radiu
 pre{background:var(--code);padding:.8rem;border-radius:6px;overflow-x:auto}pre code{background:none;padding:0}
 table{border-collapse:collapse;width:100%;font-size:.95rem;display:block;overflow-x:auto}th,td{border-bottom:1px solid var(--line);padding:.35rem .5rem;text-align:left;vertical-align:top}
 section+section{border-top:1px solid var(--line);margin-top:2rem}
-ul.below{list-style:none;padding:0}ul.below li{padding:.35rem 0;border-bottom:1px solid var(--line)}ul.below .one{color:var(--muted);font-size:.92rem}
+ul.below{list-style:none;padding:0}ul.below li{padding:.35rem 0;border-bottom:1px solid var(--line)}ul.below .one{color:var(--muted);font-size:.92rem}ul.below .n{color:var(--muted);font-size:.85rem;margin-left:.4rem}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:.5rem;margin-bottom:1rem}
+form.at{font-size:.9rem;color:var(--muted)}form.at input{font:inherit;width:9rem;padding:.15rem .35rem;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg)}form.at button{font:inherit;padding:.15rem .6rem;border:1px solid var(--line);border-radius:4px;background:var(--code);color:var(--fg);cursor:pointer}
+.near{margin:.5rem 0 1.5rem}p.from{margin:-.5rem 0 .8rem;color:var(--muted);font-size:.88rem}
 .error{border-left:3px solid #c0392b;padding:.4rem .8rem;background:var(--code)}
 footer{margin-top:2.5rem;color:var(--muted);font-size:.85rem}
 `
 
-// input: { title, crumbs: [{ label, href }], sections: [{ title, markdown,
-// below: [{ label, href, oneliner }] }], error, footer } -> HTML
+// input: { title, crumbs: [{ label, href }], sections: [{ title, from,
+// markdown, below: [{ label, href, oneliner, pages }] }], error, near: { label, href,
+// below: [{ label, href }] }, at: { value, default }, footer } -> HTML
 export function draw (input) {
   if (!input || typeof input !== 'object') throw new Error('missing argument: page ({ title, sections })')
   const sections = Array.isArray(input.sections) ? input.sections : []
   const crumbs = Array.isArray(input.crumbs) && input.crumbs.length
     ? `<nav class="crumbs">${input.crumbs.map(c => c.href ? `<a href="${escape(c.href)}">${escape(c.label)}</a>` : escape(c.label)).join(' / ')}</nav>`
     : ''
+  // another mrepo, by its position: a plain form, its section's top
+  const at = input.at ? `<form class="at" action="./"><label>mrepo <input name="at" value="${escape(input.at.value ?? '')}" placeholder="${escape(input.at.default ?? '')}"></label> <button>read</button></form>` : ''
+  const top = crumbs || at ? `<div class="top">${crumbs}${at}</div>` : ''
   const body = sections.map(s => {
     const below = Array.isArray(s.below) && s.below.length
-      ? `<h2>Below</h2><ul class="below">${s.below.map(b => `<li><a href="${escape(b.href)}">${escape(b.label)}</a>${b.oneliner ? `<div class="one">${inline(b.oneliner)}</div>` : ''}</li>`).join('')}</ul>`
+      ? `<h2>Below</h2><ul class="below">${s.below.map(b => `<li><a href="${escape(b.href)}">${escape(b.label)}</a>${b.pages > 1 ? `<span class="n">${b.pages} pages</span>` : ''}${b.oneliner ? `<div class="one">${inline(b.oneliner)}</div>` : ''}</li>`).join('')}</ul>`
       : ''
-    return `<section>${s.title ? `<h1>${escape(s.title)}</h1>` : ''}${markdown(String(s.markdown ?? '').replace(/^#\s+.*\n+/, ''))}${below}</section>`
+    const from = Array.isArray(s.from) && s.from.length ? `<p class="from">${s.from.length > 1 ? `in ${s.from.length} packages: ` : 'in '}${s.from.map(escape).join(', ')}</p>` : ''
+    return `<section>${s.title ? `<h1>${escape(s.title)}</h1>` : ''}${from}${markdown(String(s.markdown ?? '').replace(/^#\s+.*\n+/, ''))}${below}</section>`
   }).join('\n')
   const error = input.error ? `<p class="error">${escape(input.error)}</p>` : ''
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(input.title ?? 'Splectral')}</title><style>${STYLE}</style></head><body><main>${crumbs}${error}${body}${input.footer ? `<footer>${inline(input.footer)}</footer>` : ''}</main></body></html>`
+  const near = input.near ? `<div class="near">Nearest: <a href="${escape(input.near.href)}">${escape(input.near.label)}</a>${input.near.below?.length ? `; below it: ${input.near.below.map(b => `<a href="${escape(b.href)}">${escape(b.label)}</a>`).join(', ')}` : ''}</div>` : ''
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(input.title ?? 'Splectral')}</title><style>${STYLE}</style></head><body><main>${top}${error}${near}${body}${input.footer ? `<footer>${inline(input.footer)}</footer>` : ''}</main></body></html>`
 }

@@ -23,6 +23,8 @@ test('markdown: headings, paragraphs, lists nested, code, tables; everything esc
   t.is(markdown('| a | b |\n|---|---|\n| `1` | 2 |'), '<table><thead><tr><th>a</th><th>b</th></tr></thead><tbody><tr><td><code>1</code></td><td>2</td></tr></tbody></table>')
   t.is(markdown('<script>x</script>'), '<p>&lt;script&gt;x&lt;/script&gt;</p>', 'no HTML passes')
   t.is(inline('[a](b)', { link: h => `/v/${h}` }), '<a href="/v/b">a</a>', 'a link\'s address rewritten')
+  t.is(inline('**`haicc scripts`** lists'), '<strong><code>haicc scripts</code></strong> lists', 'bold that holds code')
+  t.is(inline('`**not bold**` and [`x`](y)'), '<code>**not bold**</code> and <a href="y"><code>x</code></a>', 'code never markup; a link that holds code')
 })
 
 test('draw: a whole page, its sections, the keywords below as links; no page given refused', (t) => {
@@ -49,7 +51,7 @@ function execution (answers) {
 }
 
 test('page: the keywords asked of the docs mrepo, drawn; links to the same view, relative; the command it shows', async (t) => {
-  const exec = execution({ 'docs info/get hdlc/validation': { keyword: 'hdlc/validation', choices: [{ title: 'Validation', page: 'Before every commit.', below: [{ keyword: 'hdlc/validation/x', oneliner: 'X.' }] }] } })
+  const exec = execution({ 'docs info/get hdlc/validation': { keyword: 'hdlc/validation', choices: [{ title: 'Validation', page: 'Before every commit.', below: [{ keyword: 'hdlc/validation/x', oneliner: 'X.', choices: 1 }, { keyword: 'hdlc/validation/y', oneliner: 'Y.', choices: 3 }] }] } })
   const html = await page(exec, { uri: 'hdlc/validation', query: {} })
   t.is(DEFAULT, 'docs')
   t.alike(exec.asked, [['docs', 'info/get', 'hdlc/validation']], 'its data: info/get at the docs mrepo, the keywords as the command line has them')
@@ -57,11 +59,13 @@ test('page: the keywords asked of the docs mrepo, drawn; links to the same view,
   t.ok(html.includes('<nav class="crumbs"><a href="./">docs</a> / <a href="hdlc">hdlc</a> / validation</nav>'), 'where it is, from the top: links relative to its section')
   t.ok(html.includes('<h1>Validation</h1><p>Before every commit.</p>'), 'a choice a section')
   t.ok(html.includes('<a href="hdlc/validation/x">hdlc/validation/x</a><div class="one">X.</div>'), 'the keywords below, links to the same view, relative: right wherever it is mounted')
+  t.ok(html.includes('<a href="hdlc/validation/y">hdlc/validation/y</a><span class="n">3 pages</span>'), 'how many pages a keyword opens, when more than one')
+  t.ok(html.includes('<form class="at" action="./"><label>mrepo <input name="at" value="docs" placeholder="docs"></label> <button>read</button></form>'), 'another mrepo: a plain form, its section\'s top')
   t.ok(html.includes('<footer><code>haicc docs info/get hdlc/validation</code></footer>'), 'the command it shows')
 })
 
-test('page: the top; another mrepo; an answer that is an error said on the page; an at that is no position refused', async (t) => {
-  const exec = execution({ 'docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [{ keyword: 'hdlc' }] }] }, 'host info/get service': new Error('no page here: service') })
+test('page: the top; another mrepo; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from; an at that is no position refused', async (t) => {
+  const exec = execution({ 'docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [{ keyword: 'hdlc' }] }] }, 'host info/get service': new Error('no page here: service'), 'docs info/get hdlc/nope': new Error('no hdlc/nope here: nearest hdlc, below it validation, branches') })
   const top = await page(exec, { uri: '' })
   t.alike(exec.asked[0], ['docs', 'info/get'], 'the top: info/get alone')
   t.ok(top.includes('<a href="hdlc">hdlc</a>'))
@@ -69,6 +73,12 @@ test('page: the top; another mrepo; an answer that is an error said on the page;
   t.alike(exec.asked[1], ['host', 'info/get', 'service'], 'another mrepo, by its position')
   t.ok(other.includes('<p class="error">no page here: service</p>'), 'its error said on the page')
   t.ok(other.includes('<a href="./?at=host">host</a>'), 'its links keep the mrepo')
+  const nope = await page(exec, { uri: 'hdlc/nope' })
+  t.ok(nope.includes('<div class="near">Nearest: <a href="hdlc">hdlc</a>; below it: <a href="hdlc/validation">hdlc/validation</a>, <a href="hdlc/branches">hdlc/branches</a></div>'), 'a keyword not there: the nearest and what is below it, links')
+  const shared = execution({ 'docs info/get haicc/package': { keyword: 'haicc/package', choices: [{ title: 'Package', page: 'A.', below: [], packages: ['haiccing/base-app-haicc'] }, { title: 'Package', page: 'B.', below: [], packages: ['haiccing/base-package-haicc'] }] }, 'docs info/get haicc/test-reports': { keyword: 'haicc/test-reports', choices: [{ title: 'test-reports/', page: 'The proof.', below: [], packages: ['haiccing/a', 'haiccing/b'] }] }, 'docs info/get hdlc': { keyword: 'hdlc', choices: [{ title: 'HDLC', page: 'How.', below: [], packages: ['haiccing/base-docs-hdlc'] }] } })
+  t.ok((await page(shared, { uri: 'haicc/package' })).includes('<h1>Package</h1><p class="from">in haiccing/base-app-haicc</p>'), 'several answers: each says where it is from')
+  t.ok((await page(shared, { uri: 'haicc/test-reports' })).includes('<p class="from">in 2 packages: haiccing/a, haiccing/b</p>'), 'one page several packages share: said once, its packages')
+  t.absent((await page(shared, { uri: 'hdlc' })).includes('class="from"'), 'one answer from one package: nothing to say')
   await t.exception(page(exec, { uri: '', query: { at: '../x' } }), /not an mrepo's position/)
 })
 

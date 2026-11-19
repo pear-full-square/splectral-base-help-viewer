@@ -36,6 +36,11 @@ top; the command it shows, at the end.
 - **The data is the platform's**: asked for with `exec.data(at,
   command)`, run as a terminal runs a command; the answer mapped to the
   page's input and drawn (`draw`).
+- **Where a section is from**: its packages, said when a keyword has
+  several answers (three packages' "Package") or one page several
+  packages share (a template's generic page, once).
+- **A keyword not there**: what `info/get` said, and its nearest
+  keyword and those below it (from that answer) as links.
 - **Relative links**: to the keywords below and back up, relative to
   its section (`hdlc/validation`, `./?at=host`): right wherever it is
   mounted; the site gives the page its base.
