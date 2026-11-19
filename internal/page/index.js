@@ -7,21 +7,22 @@ import { draw } from '../draw/index.js'
 export const DEFAULT = 'docs'
 const AT = /^[a-z][a-z0-9-]*(\/[a-z][a-z0-9-]*)*$/
 
-// form: { uri: the keywords, the path below the component; query: { at };
-// base: the component's own address, /<position> }
-export async function page (exec, { uri = '', query = {}, base = '' } = {}) {
+// form: { uri: the keywords, the path below the component; query: { at } }
+// Its links relative to its section: right wherever it is mounted (the
+// site gives the page its base).
+export async function page (exec, { uri = '', query = {} } = {}) {
   const at = query.at ?? DEFAULT
   if (!AT.test(at)) throw new Error(`not an mrepo's position: ${at}`)
   const keywords = String(uri ?? '').split('/').filter(Boolean).join('/')
   const suffix = at === DEFAULT ? '' : `?at=${encodeURIComponent(at)}`
-  const href = k => `${base}/${k}${suffix}`
+  const href = k => `${k}${suffix}`
   // the data: the platform's, asked for; the page: drawn
   const command = keywords ? ['info/get', keywords] : ['info/get']
   let answer = null
   let error = null
   try { answer = await exec.data(at, command) } catch (err) { error = err.message }
   const names = keywords ? keywords.split('/') : []
-  const crumbs = [{ label: at, href: `${base}/${suffix}` }, ...names.map((n, i) => ({ label: n, href: i < names.length - 1 ? href(names.slice(0, i + 1).join('/')) : null }))]
+  const crumbs = [{ label: at, href: `./${suffix}` }, ...names.map((n, i) => ({ label: n, href: i < names.length - 1 ? href(names.slice(0, i + 1).join('/')) : null }))]
   const choices = Array.isArray(answer?.choices) ? answer.choices : []
   const sections = choices.map(c => ({
     title: c.title,

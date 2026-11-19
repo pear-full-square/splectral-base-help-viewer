@@ -10,7 +10,7 @@ drawn. The docs mrepo is read unless another is asked for
 
 ## Signature
 
-`page(exec, { uri, query, base })`: `exec` what the program hands it,
+`page(exec, { uri, query })`: `exec` what the program hands it,
 `data(at, command)` and `log(level, event, data)`.
 
 ## Arguments
@@ -18,8 +18,6 @@ drawn. The docs mrepo is read unless another is asked for
 - `uri`: the keywords, the path below the component; none: the top.
 - `query.at`: the mrepo read, by its position from the root; `docs` by
   default.
-- `base`: the component's own address, `/<position>`: its links made
-  from it.
 
 ## Returns
 
@@ -38,6 +36,9 @@ top; the command it shows, at the end.
 - **The data is the platform's**: asked for with `exec.data(at,
   command)`, run as a terminal runs a command; the answer mapped to the
   page's input and drawn (`draw`).
+- **Relative links**: to the keywords below and back up, relative to
+  its section (`hdlc/validation`, `./?at=host`): right wherever it is
+  mounted; the site gives the page its base.
 - **Help specific**: it knows `info/get`'s answer (its choices, the
   keywords below each); a viewer of other commands' answers is the
   generic viewer's, designed from this one.

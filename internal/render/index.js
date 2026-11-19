@@ -36,7 +36,7 @@ export function render ({ side, installed, timeout = 120, every = 2000 }) {
     const exec = execution()
     const started = Date.now()
     Promise.resolve()
-      .then(() => page(exec, { uri: form.path ?? '', query: form.query ?? {}, base: form.base ?? '' }))
+      .then(() => page(exec, { uri: form.path ?? '', query: form.query ?? {} }))
       .then(output => ({ output: String(output ?? '') }), err => ({ error: err.message }))
       .then(done => {
         exec.log('info', 'page', { path: form.path ?? '', ms: Date.now() - started, ok: !('error' in done) })

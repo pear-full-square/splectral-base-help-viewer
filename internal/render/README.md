@@ -22,7 +22,7 @@ None thrown: what fails is the page's `error`.
 ## Design
 
 - **The fixed exchange** (`splectral-server`, `internal/components`): a
-  page asked for, `{ request: "page", path, query, base }`, answered
+  page asked for, `{ request: "page", path, query }`, answered
   under its key in the Splectral outbox, `output` the page; a data
   request written there, `{ request: "data", at, command }`, its
   completed form back in the inbox under its key. A record taken from the
@@ -31,6 +31,5 @@ None thrown: what fails is the page's `error`.
   data, a promise of the command's output (its error thrown);
   `exec.log(level, event, data)`.
 - **The page**: `page` (beside it), called in this process, `{ uri,
-  query, base }`: the path below the component, the query, the
-  component's own address. Nothing is taken by name: the help viewer is
+  query }`: the path below the component, the query. Nothing is taken by name: the help viewer is
   one page.
