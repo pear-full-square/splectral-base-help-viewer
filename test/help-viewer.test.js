@@ -28,7 +28,7 @@ test('markdown: headings, paragraphs, lists nested, code, tables; everything esc
   t.is(inline('`**not bold**` and [`x`](y)'), '<code>**not bold**</code> and <a href="y"><code>x</code></a>', 'code never markup; a link that holds code')
 })
 
-test('draw: a whole page, its sections, the keywords below as links, the navigation a drop-down a level; raw; no page given refused', (t) => {
+test('draw: a whole page, its sections, the keywords below as links, the navigation a drop-down a level; raw; the command box and a command\'s help; no page given refused', (t) => {
   const html = draw({ title: 'Validation', nav: { mrepos: [{ label: 'docs', value: './', selected: true }], levels: [[{ label: '–', value: './', selected: false }, { label: 'validation', value: 'validation', selected: true }]] }, view: { label: 'raw', href: 'validation?raw' }, sections: [{ title: 'Validation', markdown: '# Validation\n\nBefore **every** commit.', below: [{ label: 'hdlc/test', href: '/v/hdlc/test', oneliner: 'The `tests`.' }] }], footer: 'at `docs`' })
   t.ok(html.startsWith('<!doctype html>'), 'a whole page')
   t.ok(html.includes('<title>Validation</title>'))
@@ -40,6 +40,9 @@ test('draw: a whole page, its sections, the keywords below as links, the navigat
   t.alike(html.match(/<script>[^<]*<\/script>/g), ['<script>function go(s){if(s.value)top.location.href=new URL(s.value,document.baseURI).href}</script>'], 'one script only: a choice opens its address at the top')
   t.ok(draw({ title: 'x', raw: '{\n  "a": "<b>"\n}' }).includes('<pre class="raw"><code>{\n  &quot;a&quot;: &quot;&lt;b&gt;&quot;\n}</code></pre>'), 'raw: the text as it is, escaped')
   t.absent(draw({ title: 'x' }).includes('<script'), 'no navigation, no script')
+  t.ok(draw({ title: 'x', box: { value: 'host "a"', placeholder: 'docs info/get' } }).includes('<form class="cmd" action="./"><input name="cmd" value="host &quot;a&quot;" placeholder="docs info/get"'), 'the command box: a plain form, what was typed kept')
+  const card = draw({ title: 'x', help: { command: 'haicc host crud/read x', does: 'Reads `x`.', door: 'refused here: no', taken: false, arguments: 'none', run: 'haicc host crud/read x', more: { label: 'haicc host info/get crud/read', href: 'crud/read?at=host' } } })
+  t.ok(card.includes('<h1><code>haicc host crud/read x</code></h1><dl class="help"><dt>does</dt><dd>Reads <code>x</code>.</dd><dt>door</dt><dd class="refused">refused here: no</dd>'), 'a command\'s help: the command, what it does, the door')
   t.ok(draw({ title: 'x', error: 'no <answer>' }).includes('<p class="error">no &lt;answer&gt;</p>'), 'an error said')
   t.exception(() => draw(), /missing argument: page/)
 })
@@ -102,6 +105,43 @@ test('page: raw: the command\'s response whole, as the terminal prints it (to 80
   t.absent(html.includes('<section>'), 'nothing drawn')
   const failed = await page(execution(DOCS), { uri: 'nope', query: { raw: '' } })
   t.ok(failed.includes('<p class="error">no response</p>'), 'no response: said')
+})
+
+test('page: the command box: a command as typed after haicc, sent with the help flag, its help drawn; refused; not run; an error; raw; not a command', async (t) => {
+  const rec = (command, done) => JSON.stringify({ topic: '/outbox', key: 'k', timestamp: 't', headers: {}, value: { topic: '/splectral', key: 'k', timestamp: 't', headers: {}, value: { command, ...done } } }) + '\n'
+  const taken = { help: 'crud/read swarms', does: 'The nodes at a URI, read.', door: 'taken here, now', arguments: 'none', run: 'crud/read swarms', more: 'info/get crud/read' }
+  const records = {
+    'host crud/read swarms --flags help': rec(['haicc', 'host', 'crud/read', 'swarms', '--flags', 'help'], { output: taken }),
+    'host crud/read x --flags help log=debug': rec([], { output: { ...taken, help: 'crud/read x --flags log=debug', run: 'crud/read x --flags log=debug' } }),
+    'host --flags log=debug -- crud/read x --flags help': rec([], { output: { ...taken, help: 'crud/read x' } }),
+    'host crud/update x --flags help': rec([], { output: { ...taken, help: 'crud/update x', does: null, door: 'refused here: no action: crud update (create, delete, read)', run: 'crud/update x', more: 'info/get crud' } }),
+    '. crud/read x --flags help nope': rec([], { output: { run: false, command: 'crud/read x --flags help nope', why: ['no flag: nope'] } }),
+    'nowhere info/get --flags help': rec([], { error: 'haicc nowhere: no node there' })
+  }
+  const exec = execution(DOCS, { records })
+  const html = await page(exec, { uri: '', query: { cmd: 'haicc host crud/read swarms' } })
+  t.alike(exec.asked.at(-1), ['raw', 'host', 'crud/read', 'swarms', '--flags', 'help'], 'sent at its position with the help flag: answered, nothing of it run; never kept')
+  t.ok(html.includes('<h1><code>haicc host crud/read swarms</code></h1>'), 'the command as understood, as typed')
+  t.ok(html.includes('<dt>does</dt><dd>The nodes at a URI, read.</dd>'), 'what it does')
+  t.ok(html.includes('<dd class="taken">taken here, now</dd>'), 'the door\'s answer here and now')
+  t.ok(html.includes('<dt>run it</dt><dd><code>haicc host crud/read swarms</code></dd>'), 'the command to run it, from the terminal')
+  t.ok(html.includes('<a href="crud/read?at=host">haicc host info/get crud/read</a>'), 'to read more: its page at that mrepo, in this viewer')
+  t.ok(html.includes('<form class="cmd" action="./"><input name="cmd" value="host crud/read swarms"'), 'the box keeps what was typed')
+  t.ok(html.includes('<option value="./?at=host" selected>host</option>'), 'the mrepo it runs in, chosen')
+  t.ok(html.includes('<a class="view" href="./?cmd=host%20crud%2Fread%20swarms&amp;raw">raw</a>'), 'raw a link away')
+  await page(exec, { uri: '', query: { cmd: 'host crud/read x --flags log=debug' } })
+  t.alike(exec.asked.at(-1).slice(1), ['host', 'crud/read', 'x', '--flags', 'help', 'log=debug'], 'a list of its own: help put in it')
+  await page(exec, { uri: '', query: { cmd: 'host --flags log=debug -- crud/read x' } })
+  t.alike(exec.asked.at(-1).slice(1), ['host', '--flags', 'log=debug', '--', 'crud/read', 'x', '--flags', 'help'], 'a list on a step that passes on: help on the last command, a list of its own')
+  t.ok((await page(exec, { uri: '', query: { cmd: 'host crud/update x' } })).includes('<dd class="refused">refused here: no action: crud update (create, delete, read)</dd>'), 'refused at the door: said why')
+  t.ok((await page(exec, { uri: '', query: { cmd: '. crud/read x --flags nope' } })).includes('<p class="error">not run: no flag: nope</p>'), 'not run: said why')
+  t.ok((await page(exec, { uri: '', query: { cmd: 'nowhere info/get' } })).includes('<p class="error">haicc nowhere: no node there</p>'), 'an error: said')
+  const raw = await page(exec, { uri: '', query: { cmd: 'host crud/read swarms', raw: '' } })
+  t.ok(raw.includes(`<pre class="raw"><code>${escape(unpack(records['host crud/read swarms --flags help'], WIDTH))}</code></pre>`), 'raw: the response as the terminal prints it')
+  t.ok((await page(exec, { uri: '', query: { cmd: 'host' } })).includes('<p class="error">a command as typed after haicc: &lt;position&gt; &lt;protocol&gt;/&lt;action&gt; [&lt;argument&gt;...] (. the root)</p>'), 'a position alone: not a command')
+  t.ok((await page(exec, { uri: '', query: { cmd: '../x info/get' } })).includes('<p class="error">not an mrepo&#39;s position: ../x</p>'), 'no position: said')
+  t.ok((await page(exec, { uri: '', query: { cmd: 'host "open' } })).includes('a quote not closed'), 'split as the shell splits it')
+  t.ok((await page(execution(DOCS), { uri: 'hdlc/validation', query: {} })).includes('<form class="cmd" action="./"><input name="cmd" value="" placeholder="docs info/get hdlc/validation"'), 'on every page, the command it shows the example')
 })
 
 test('page: the top; another mrepo; the root; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from; an at that is no position refused', async (t) => {

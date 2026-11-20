@@ -21,6 +21,9 @@ event, data)`.
   root itself); `docs` by default.
 - `query.raw`: there (`?raw`): the command's response whole, as the
   terminal prints it.
+- `query.cmd`: a command as typed after `haicc` (`?cmd=host crud/read
+  swarms`, its position first, `.` the root): answered with help, not
+  run.
 
 ## Returns
 
@@ -55,6 +58,16 @@ the response printed; the command it shows, at the end.
   own `unpack` (`haicc-base-app`), to the width it prints to when its
   output is no terminal (`WIDTH`, 80); never kept. A link switches
   between the two views; a choice keeps the view.
+- **The command box** (the team, 2026-11-20): a command typed is sent
+  with the help flag on its last command (into its own list when it has
+  one), so nothing of it is executed (a rewrite, strict:
+  `mrepo-base-request`); `help/annotate`'s answer drawn where it would
+  run: the command, what it does, the door's answer here and now, its
+  arguments, `run it` with the position typed in front, `read more` a
+  link to that page at that mrepo, in this viewer. Not run, an error,
+  not a command: said. Never kept: the door's answer is now. `?raw` the
+  same, as the terminal prints it. The box on every page, the page's own
+  command its example.
 - **Where a section is from**: its packages, said when a keyword has
   several answers (three packages' "Package") or one page several
   packages share (a template's generic page, once).

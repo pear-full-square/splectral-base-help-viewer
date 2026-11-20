@@ -2,6 +2,7 @@
 // info/get <keywords>` answers, drawn; or, raw, as the terminal prints it
 // (README.md beside it).
 import { unpack } from 'haicc-base-app'
+import { words } from 'mrepo-base-request'
 import { draw } from '../draw/index.js'
 
 // The mrepo read when none is asked for: the docs mrepo, the install's
@@ -24,10 +25,19 @@ const belowOf = answer => {
 // A keyword named below its parent: the part after it.
 const relative = (parent, keyword) => parent && keyword.startsWith(`${parent}/`) ? keyword.slice(parent.length + 1) : keyword
 
+// The mrepos' drop-down: the install's, a tree, each to its top; `at`
+// chosen (there even when the server did not say it).
+function mreposOf (list, at, address) {
+  const mrepos = (list?.mrepos ?? []).map(m => ({ label: `${'  '.repeat(m.depth)}${m.at === '.' ? '. (the root)' : m.at.split('/').pop()}`, value: address('', { mrepo: m.at }), selected: m.at === at }))
+  if (!mrepos.some(m => m.selected)) mrepos.push({ label: at, value: address('', { mrepo: at }), selected: true })
+  return mrepos
+}
+
 // form: { uri: the keywords, the path below the component; query: { at,
-// raw } }. Its links relative to its section: right wherever it is
+// raw, cmd } }. Its links relative to its section: right wherever it is
 // mounted (the site gives the page its base).
 export async function page (exec, { uri = '', query = {} } = {}) {
+  if (typeof query.cmd === 'string') return commandPage(exec, query)
   const at = query.at ?? DEFAULT
   if (!AT.test(at)) throw new Error(`not an mrepo's position: ${at}`)
   const raw = 'raw' in query
@@ -54,8 +64,7 @@ export async function page (exec, { uri = '', query = {} } = {}) {
   const { answer, error } = current
   // the navigation: the mrepo, then a level a keyword, each level's
   // choices its parent's own answer's below; then what is below this page
-  const mrepos = (list?.mrepos ?? []).map(m => ({ label: `${'  '.repeat(m.depth)}${m.at === '.' ? '. (the root)' : m.at.split('/').pop()}`, value: address('', { mrepo: m.at }), selected: m.at === at }))
-  if (!mrepos.some(m => m.selected)) mrepos.push({ label: at, value: address('', { mrepo: at }), selected: true })
+  const mrepos = mreposOf(list, at, address)
   const option = (parent, b, chosen) => ({ label: `${relative(parent, b.keyword)}${(b.choices ?? 1) > 1 ? ` (${b.choices})` : ''}`, value: address(b.keyword), selected: b.keyword === chosen })
   const levels = names.map((_, i) => {
     const parent = parents[i]
@@ -68,11 +77,12 @@ export async function page (exec, { uri = '', query = {} } = {}) {
   const next = belowOf(answer)
   if (next.length) levels.push([{ label: '…', value: '', selected: true }, ...next.map(b => option(keywords, b, null))])
   const nav = { mrepos, levels }
+  const box = { value: '', placeholder: `${at} ${command.join(' ')}` }
   const footer = `\`haicc ${at} ${command.join(' ')}\``
   const title = keywords ? `${keywords} · ${at}` : at
   exec.log('verbose', 'page', { at, keywords: keywords || '.', raw, error })
   if (raw) {
-    return draw({ title, nav, view: { label: 'page', href: address(keywords, { asRaw: false }) }, raw: current.text === null ? null : unpack(current.text, WIDTH), error: current.text === null ? error : null, footer })
+    return draw({ title, nav, box, view: { label: 'page', href: address(keywords, { asRaw: false }) }, raw: current.text === null ? null : unpack(current.text, WIDTH), error: current.text === null ? error : null, footer })
   }
   const choices = Array.isArray(answer?.choices) ? answer.choices : []
   // where a section is from, when that is not obvious: several answers, or one page several packages share
@@ -91,10 +101,69 @@ export async function page (exec, { uri = '', query = {} } = {}) {
   return draw({
     title,
     nav,
+    box,
     view: { label: 'raw', href: address(keywords, { asRaw: true }) },
     sections,
     error: error ?? (choices.length ? null : `nothing at ${keywords || '.'}`),
     near,
+    footer
+  })
+}
+
+// The command box: a command as typed after `haicc` (its position first,
+// `.` the root), answered with help where it would run: sent with the help
+// flag, so nothing of it is executed (a rewrite, strict: mrepo-base-request).
+// The answer drawn; raw, as the terminal prints it. Never kept: the door's
+// answer is here and now.
+async function commandPage (exec, query) {
+  const raw = 'raw' in query
+  const typed = String(query.cmd).trim().replace(/^haicc\s+/, '')
+  const self = asRaw => `./?cmd=${encodeURIComponent(typed)}${asRaw ? '&raw' : ''}`
+  let parts = []
+  let problem = null
+  try { parts = words(typed) } catch (err) { problem = err.message }
+  const [position, ...rest] = parts
+  if (!problem && (!position || !rest.length)) problem = 'a command as typed after haicc: <position> <protocol>/<action> [<argument>...] (. the root)'
+  if (!problem && !AT.test(position)) problem = `not an mrepo's position: ${position}`
+  const at = problem ? (AT.test(query.at ?? '') ? query.at : DEFAULT) : position
+  const address = (k, { mrepo = at } = {}) => `${k || './'}${mrepo === DEFAULT ? '' : `?at=${encodeURIComponent(mrepo)}`}`
+  // catch: the mrepos not known (the server did not say): this one alone in its drop-down
+  const list = await exec.mrepos().catch(() => null)
+  const nav = { mrepos: mreposOf(list, at, address), levels: [] }
+  const box = { value: typed, placeholder: `${at} info/get` }
+  const title = `${typed || 'a command'} · help`
+  if (problem) return draw({ title, nav, box, error: problem })
+  // the help flag on the last command: after a list of its own, or a list of its own
+  const last = rest.lastIndexOf('--flags')
+  const command = last >= 0 && !rest.slice(last).includes('--') ? [...rest.slice(0, last + 1), 'help', ...rest.slice(last + 1)] : [...rest, '--flags', 'help']
+  const footer = `\`haicc ${at} ${command.join(' ')}\``
+  let text = null
+  let form = null
+  let error = null
+  try { text = await exec.record(at, command); form = JSON.parse(text).value.value } catch (err) { error = err.message }
+  exec.log('verbose', 'command', { at, command: command.join(' '), raw, error })
+  if (raw) return draw({ title, nav, box, view: { label: 'page', href: self(false) }, raw: text === null ? null : unpack(text, WIDTH), error: text === null ? error : null, footer })
+  const view = { label: 'raw', href: self(true) }
+  const out = form?.output
+  if (form && 'error' in form) return draw({ title, nav, box, view, error: form.error, footer })
+  if (out?.run === false) return draw({ title, nav, box, view, error: `not run: ${(out.why ?? []).join('; ')}`, footer })
+  if (!out || typeof out.door !== 'string') return draw({ title, nav, box, view, error: error ?? 'no help in the answer', footer })
+  // to read more: the info page it names, at that mrepo, in this viewer
+  const more = /^info\/get(?: (\S+))?$/.exec(out.more ?? '')
+  return draw({
+    title,
+    nav,
+    box,
+    view,
+    help: {
+      command: `haicc ${at} ${out.help}`,
+      does: out.does,
+      door: out.door,
+      taken: out.door.startsWith('taken'),
+      arguments: out.arguments,
+      run: `haicc ${at} ${out.run}`,
+      more: more ? { label: `haicc ${at} ${out.more}`, href: address(more[1] ?? '') } : null
+    },
     footer
   })
 }

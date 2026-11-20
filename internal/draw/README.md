@@ -4,8 +4,10 @@ The help page as HTML, whole: its sections in markdown, the keywords below each 
 
 ## Signature
 
-`draw(input)`: `input` the page, `{ title, nav, view, sections, raw,
-error, near, footer }`: `nav` where it is and where to go, `{ mrepos,
+`draw(input)`: `input` the page, `{ title, nav, box, view, sections,
+help, raw, error, near, footer }`: `box` the command box, `{ value,
+placeholder }`; `help` a command's help, `{ command, does, door, taken,
+arguments, run, more: { label, href } }`; `nav` where it is and where to go, `{ mrepos,
 levels }`, `mrepos` the mrepo's drop-down and `levels` one a level, each
 a list of `{ label, value, selected }`, `value` an address; `view` the
 other view, `{ label, href }`; `raw` a text shown as it is;
