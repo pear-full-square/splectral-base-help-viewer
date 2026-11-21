@@ -243,7 +243,7 @@ test('render: help asked typed: its answer back from the server as AVRO, read as
   const store = join(dir, 'store')
   const reg = registry(schemasOf(store))
   // what a deploy registers: help's answer, the server's data form
-  reg.add({ type: 'record', name: 'haiccing.basePackageHelp.AnnotateAnswer', fields: ['help', 'door', 'arguments', 'run', 'more'].map(name => ({ name, type: 'string' })).concat([{ name: 'does', type: ['null', 'string'], default: null }, { name: 'answer', type: { type: 'array', items: 'string' }, default: [] }]) })
+  reg.add({ type: 'record', name: 'haiccing.basePackageHelp.annotateAnswer', fields: ['help', 'door', 'arguments', 'run', 'more'].map(name => ({ name, type: 'string' })).concat([{ name: 'does', type: ['null', 'string'], default: null }, { name: 'answer', type: { type: 'array', items: 'string' }, default: [] }]) })
   reg.add(JSON.parse(readFileSync(join(here, '..', 'splectral-server', 'schemas', 'data.json'), 'utf8')))
   const installed = { ...JSON.parse(readFileSync(join(s, 'component.json'), 'utf8')), folder: dir, schemas: schemasOf(store) }
   const r = render({ side: s, installed, every: 200 })
