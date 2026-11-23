@@ -21,7 +21,7 @@ help info it shows (`info/get <keywords>` at the docs mrepo, or at
 `?at=<position>`) through the outbox, draws the page and writes it
 back. Ended by the `stop` hook, and with its runtime.
 
-`/help/hdlc/validation` is `haicc docs info/get hdlc/validation`, drawn:
+`/help/haiccing/base-docs-hdlc/validation` is `haicc docs info/get haiccing/base-docs-hdlc/validation`, drawn:
 the human sees what the AI reads on the command line. A drop-down the
 mrepo, one a level of keywords, each level's choices its parent's own
 answer; `?raw`, the response as the terminal prints it. A command box:
