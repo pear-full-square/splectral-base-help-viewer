@@ -70,9 +70,13 @@ the response printed; the command it shows, at the end.
   not a command: said. Never kept: the door's answer is now. `?raw` the
   same, as the terminal prints it. The box on every page, the page's own
   command its example.
-- **Where a section is from**: its packages, said when a keyword has
-  several answers (three packages' "Package") or one page several
-  packages share (a template's generic page, once).
+- **Where a section is from**: its package, the context it is read in,
+  always said, the page's frame: a package is self-contained, its
+  boundary visible. The context is in the address, the keywords' path
+  (`/help/haiccing/base-docs-hdlc/validation`): the organisation and the
+  package are levels of the navigation, a choice of a package sets it.
+  Without a context, its packages, said when a keyword has several
+  answers or one page several packages share.
 - **A keyword not there**: what `info/get` said, and its nearest
   keyword and those below it (from that answer) as links.
 - **Relative links**: to the keywords below and back up, relative to

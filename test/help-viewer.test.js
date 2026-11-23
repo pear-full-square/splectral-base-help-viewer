@@ -149,7 +149,7 @@ test('page: the command box: a command as typed after haicc, sent with the help 
   t.ok((await page(execution(DOCS), { uri: 'hdlc/validation', query: {} })).includes('<form class="cmd" action="./"><input name="cmd" value="" placeholder="docs info/get hdlc/validation"'), 'on every page, the command it shows the example')
 })
 
-test('page: the top; another mrepo; the root; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from; an at that is no position refused', async (t) => {
+test('page: the top; another mrepo; the root; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from, its package\'s context always; an at that is no position refused', async (t) => {
   const exec = execution({ 'docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [{ keyword: 'hdlc' }] }] }, 'host info/get': { keyword: '.', choices: [] }, 'host info/get service': new Error('no page here: service'), 'docs info/get hdlc/nope': new Error('no hdlc/nope here: nearest hdlc, below it validation, branches'), '. info/get': { keyword: '.', choices: [{ title: 'base-component-boot', page: 'Boot.' }] } })
   const top = await page(exec, { uri: '' })
   t.alike(exec.asked[0], ['docs', 'info/get'], 'the top: info/get alone')
@@ -166,6 +166,8 @@ test('page: the top; another mrepo; the root; an answer that is an error said on
   t.ok((await page(shared, { uri: 'haicc/package' })).includes('<h1>Package</h1><p class="from">in haiccing/base-app-haicc</p>'), 'several answers: each says where it is from')
   t.ok((await page(shared, { uri: 'haicc/test-reports' })).includes('<p class="from">in 2 packages: haiccing/a, haiccing/b</p>'), 'one page several packages share: said once, its packages')
   t.absent((await page(shared, { uri: 'hdlc' })).includes('class="from"'), 'one answer from one package: nothing to say')
+  const framed = execution({ 'docs info/get haiccing/base-docs-hdlc/validation': { keyword: 'haiccing/base-docs-hdlc/validation', context: 'haiccing/base-docs-hdlc', choices: [{ title: 'Validation', page: 'Before every commit.', below: [], context: 'haiccing/base-docs-hdlc', packages: ['haiccing/base-docs-hdlc'] }] } })
+  t.ok((await page(framed, { uri: 'haiccing/base-docs-hdlc/validation' })).includes('<h1>Validation</h1><p class="from">in haiccing/base-docs-hdlc</p>'), 'read in a package\'s context: its package said, the page\'s frame')
   await t.exception(page(exec, { uri: '', query: { at: '../x' } }), /not an mrepo's position/)
 })
 

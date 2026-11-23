@@ -86,8 +86,11 @@ export async function page (exec, { uri = '', query = {} } = {}) {
     return draw({ title, nav, box, view: { label: 'page', href: address(keywords, { asRaw: false }) }, raw: current.text === null ? null : unpack(current.text, WIDTH), error: current.text === null ? error : null, footer })
   }
   const choices = Array.isArray(answer?.choices) ? answer.choices : []
-  // where a section is from, when that is not obvious: several answers, or one page several packages share
-  const from = c => (choices.length > 1 || (c.packages?.length ?? 0) > 1) ? (c.packages ?? []) : []
+  // where a section is from: its package, the context it is read in, its
+  // frame (a package is self-contained: its boundary visible); without
+  // one, when that is not obvious: several answers, or one page several
+  // packages share
+  const from = c => c.context ? [c.context] : (choices.length > 1 || (c.packages?.length ?? 0) > 1) ? (c.packages ?? []) : []
   const sections = choices.map(c => ({
     title: c.title,
     from: from(c),
