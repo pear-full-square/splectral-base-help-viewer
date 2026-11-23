@@ -8,7 +8,7 @@ import { fileURLToPath } from 'bare-url'
 import { unpack } from 'haicc-base-app'
 import { registry, schemasOf, isSingle, decode, fingerprintIn } from 'mycelium-value-avro'
 import { typedBox } from 'splectral-server'
-import { markdown, inline, escape, draw, page, DEFAULT, WIDTH, render } from '../index.js'
+import { markdown, inline, escape, draw, page, DOCS, WIDTH, render } from '../index.js'
 
 const here = join(dirname(fileURLToPath(import.meta.url)), '..')
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -51,11 +51,13 @@ test('draw: a whole page, its sections, the keywords below as links, the navigat
 
 // An execution as the program hands one: the mrepos, the data asked for,
 // recorded; a response whole.
-function execution (answers, { mrepos = { version: 1, mrepos: [{ at: '.', depth: 0 }, { at: 'docs', depth: 1 }, { at: 'splectral', depth: 1 }, { at: 'splectral/help', depth: 2 }] }, records = {} } = {}) {
+function execution (answers, { mrepos = { version: 1, mrepos: [{ at: '.', depth: 0 }, { at: 'docs', depth: 1 }, { at: 'splectral', depth: 1 }, { at: 'splectral/help', depth: 2 }] }, records = {}, docs = 'docs' } = {}) {
   const asked = []
   return {
     asked,
     mrepos: async () => { if (mrepos instanceof Error) throw mrepos; return mrepos },
+    // the docs mrepo by its unique URI: where the server finds it
+    mrepo: async uri => { if (docs instanceof Error) throw docs; return { uri, position: docs } },
     data: async (at, command) => { asked.push([at, ...command]); const a = answers[`${at} ${command.join(' ')}`]; if (a instanceof Error || a === undefined) throw a ?? new Error(`no page here: ${command[1]}`); return a },
     record: async (at, command) => { asked.push(['raw', at, ...command]); const r = records[`${at} ${command.join(' ')}`]; if (r === undefined) throw new Error('no response'); return r },
     // asked typed: the completed data form as the server answers it, the response whole beside it
@@ -63,16 +65,16 @@ function execution (answers, { mrepos = { version: 1, mrepos: [{ at: '.', depth:
     log () {}
   }
 }
-const DOCS = {
+const PAGES = {
   'docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [{ keyword: 'hdlc', oneliner: 'How.' }, { keyword: 'package', choices: 3 }] }] },
   'docs info/get hdlc': { keyword: 'hdlc', choices: [{ title: 'HDLC', page: 'How.', below: [{ keyword: 'hdlc/validation' }, { keyword: 'hdlc/branches' }] }] },
   'docs info/get hdlc/validation': { keyword: 'hdlc/validation', choices: [{ title: 'Validation', page: 'Before every commit.', below: [{ keyword: 'hdlc/validation/x', oneliner: 'X.', choices: 1 }, { keyword: 'hdlc/validation/y', oneliner: 'Y.', choices: 3 }] }] }
 }
 
 test('page: the keywords asked of the docs mrepo, drawn; links to the same view, relative; the command it shows', async (t) => {
-  const exec = execution(DOCS)
+  const exec = execution(PAGES)
   const html = await page(exec, { uri: 'hdlc/validation', query: {} })
-  t.is(DEFAULT, 'docs')
+  t.is(DOCS, 'local/docs', 'the docs mrepo by its unique URI, fixed in the base family')
   t.alike(exec.asked.slice().sort(), [['docs', 'info/get'], ['docs', 'info/get', 'hdlc'], ['docs', 'info/get', 'hdlc/validation']], 'its data: info/get at the docs mrepo, the keywords as the command line has them; and each level above')
   t.ok(html.includes('<title>hdlc/validation · docs</title>'), 'its title: the keywords and the mrepo')
   t.ok(html.includes('<h1>Validation</h1><p>Before every commit.</p>'), 'a choice a section')
@@ -83,23 +85,23 @@ test('page: the keywords asked of the docs mrepo, drawn; links to the same view,
 })
 
 test('page: the navigation: the mrepo, the install\'s, a drop-down; a level a keyword, each one\'s choices its parent\'s answer; then what is below', async (t) => {
-  const html = await page(execution(DOCS), { uri: 'hdlc/validation', query: {} })
+  const html = await page(execution(PAGES), { uri: 'hdlc/validation', query: {} })
   const selects = html.match(/<select[^>]*>.*?<\/select>/g)
   t.is(selects.length, 4, 'the mrepo, two levels, what is below')
   t.is(selects[0], '<select aria-label="mrepo" onchange="go(this)"><option value="./?at=.">. (the root)</option><option value="./" selected>  docs</option><option value="./?at=splectral">  splectral</option><option value="./?at=splectral%2Fhelp">    help</option></select>', 'the mrepos as the server knows them, a tree; each its top; this one chosen')
   t.is(selects[1], '<select aria-label="level 1" onchange="go(this)"><option value="./">–</option><option value="hdlc" selected>hdlc</option><option value="package">package (3)</option></select>', 'the first level: the top\'s below; how many pages a keyword opens; back up')
   t.is(selects[2], '<select aria-label="level 2" onchange="go(this)"><option value="hdlc">–</option><option value="hdlc/validation" selected>validation</option><option value="hdlc/branches">branches</option></select>', 'the next: hdlc\'s below, named below it')
   t.is(selects[3], '<select aria-label="level 3" onchange="go(this)"><option value="" selected>…</option><option value="hdlc/validation/x">x</option><option value="hdlc/validation/y">y (3)</option></select>', 'what is below this page: nothing chosen yet')
-  const top = await page(execution(DOCS), { uri: '' })
+  const top = await page(execution(PAGES), { uri: '' })
   t.is(top.match(/<select/g).length, 2, 'the top: the mrepo and what is below it')
-  const lost = await page(execution(DOCS, { mrepos: new Error('no server') }), { uri: '', query: { at: 'host' } })
+  const lost = await page(execution(PAGES, { mrepos: new Error('no server') }), { uri: '', query: { at: 'host' } })
   t.ok(lost.includes('<select aria-label="mrepo" onchange="go(this)"><option value="./?at=host" selected>host</option></select>'), 'the mrepos not known: this one alone')
-  t.ok((await page(execution({ 'docs info/get': DOCS['docs info/get'] }), { uri: 'hdlc/validation' })).includes('<option value="hdlc/validation" selected>validation</option>'), 'a level whose parent did not answer: this page\'s keyword still')
+  t.ok((await page(execution({ 'docs info/get': PAGES['docs info/get'] }), { uri: 'hdlc/validation' })).includes('<option value="hdlc/validation" selected>validation</option>'), 'a level whose parent did not answer: this page\'s keyword still')
 })
 
 test('page: raw: the command\'s response whole, as the terminal prints it (to 80); the navigation kept; the drawn page a link away', async (t) => {
-  const text = JSON.stringify({ topic: '/outbox', key: 'k', timestamp: 't', headers: {}, value: { topic: '/splectral', key: 'k', timestamp: 't', headers: {}, value: { command: ['haicc', 'docs', 'info/get', 'hdlc'], output: DOCS['docs info/get hdlc'] } } }) + '\n'
-  const exec = execution(DOCS, { records: { 'docs info/get hdlc': text } })
+  const text = JSON.stringify({ topic: '/outbox', key: 'k', timestamp: 't', headers: {}, value: { topic: '/splectral', key: 'k', timestamp: 't', headers: {}, value: { command: ['haicc', 'docs', 'info/get', 'hdlc'], output: PAGES['docs info/get hdlc'] } } }) + '\n'
+  const exec = execution(PAGES, { records: { 'docs info/get hdlc': text } })
   const html = await page(exec, { uri: 'hdlc', query: { raw: '' } })
   t.ok(exec.asked.some(a => a[0] === 'raw' && a.join(' ') === 'raw docs info/get hdlc'), 'the response asked whole')
   t.ok(html.includes(`<pre class="raw"><code>${escape(unpack(text, WIDTH))}</code></pre>`), 'printed as the terminal prints it, its width when no terminal')
@@ -107,7 +109,7 @@ test('page: raw: the command\'s response whole, as the terminal prints it (to 80
   t.ok(html.includes('<option value="hdlc/validation?raw">validation</option>'), 'what is below, from the response: each choice raw too')
   t.ok(html.includes('<a class="view" href="hdlc">page</a>'), 'the drawn page a link away')
   t.absent(html.includes('<section>'), 'nothing drawn')
-  const failed = await page(execution(DOCS), { uri: 'nope', query: { raw: '' } })
+  const failed = await page(execution(PAGES), { uri: 'nope', query: { raw: '' } })
   t.ok(failed.includes('<p class="error">no response</p>'), 'no response: said')
 })
 
@@ -122,7 +124,7 @@ test('page: the command box: a command as typed after haicc, sent with the help 
     '. crud/read x --flags help nope': rec([], { output: { run: false, command: 'crud/read x --flags help nope', why: ['no flag: nope'] } }),
     'nowhere info/get --flags help': rec([], { error: 'haicc nowhere: no node there' })
   }
-  const exec = execution(DOCS, { records })
+  const exec = execution(PAGES, { records })
   const html = await page(exec, { uri: '', query: { cmd: 'haicc host crud/read swarms' } })
   t.alike(exec.asked.at(-1), ['raw', 'host', 'crud/read', 'swarms', '--flags', 'help'], 'sent at its position with the help flag: answered, nothing of it run; never kept')
   t.is(exec.asked.as, 'haiccing/base-package-help/annotate-answer', 'asked typed: as help/annotate\'s answer')
@@ -146,10 +148,10 @@ test('page: the command box: a command as typed after haicc, sent with the help 
   t.ok((await page(exec, { uri: '', query: { cmd: 'host' } })).includes('<p class="error">a command as typed after haicc: &lt;position&gt; &lt;protocol&gt;/&lt;action&gt; [&lt;argument&gt;...] (. the root)</p>'), 'a position alone: not a command')
   t.ok((await page(exec, { uri: '', query: { cmd: '../x info/get' } })).includes('<p class="error">not an mrepo&#39;s position: ../x</p>'), 'no position: said')
   t.ok((await page(exec, { uri: '', query: { cmd: 'host "open' } })).includes('a quote not closed'), 'split as the shell splits it')
-  t.ok((await page(execution(DOCS), { uri: 'hdlc/validation', query: {} })).includes('<form class="cmd" action="./"><input name="cmd" value="" placeholder="docs info/get hdlc/validation"'), 'on every page, the command it shows the example')
+  t.ok((await page(execution(PAGES), { uri: 'hdlc/validation', query: {} })).includes('<form class="cmd" action="./"><input name="cmd" value="" placeholder="docs info/get hdlc/validation"'), 'on every page, the command it shows the example')
 })
 
-test('page: the top; another mrepo; the root; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from, its package\'s context always; an at that is no position refused', async (t) => {
+test('page: the top; another mrepo; the root; an answer that is an error said on the page; a keyword not there, the nearest as links; where a section is from, its package\'s context always; an at that is no position refused; the docs mrepo where the server finds it, or said missing', async (t) => {
   const exec = execution({ 'docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [{ keyword: 'hdlc' }] }] }, 'host info/get': { keyword: '.', choices: [] }, 'host info/get service': new Error('no page here: service'), 'docs info/get hdlc/nope': new Error('no hdlc/nope here: nearest hdlc, below it validation, branches'), '. info/get': { keyword: '.', choices: [{ title: 'base-component-boot', page: 'Boot.' }] } })
   const top = await page(exec, { uri: '' })
   t.alike(exec.asked[0], ['docs', 'info/get'], 'the top: info/get alone')
@@ -169,6 +171,13 @@ test('page: the top; another mrepo; the root; an answer that is an error said on
   const framed = execution({ 'docs info/get haiccing/base-docs-hdlc/validation': { keyword: 'haiccing/base-docs-hdlc/validation', context: 'haiccing/base-docs-hdlc', choices: [{ title: 'Validation', page: 'Before every commit.', below: [], context: 'haiccing/base-docs-hdlc', packages: ['haiccing/base-docs-hdlc'] }] } })
   t.ok((await page(framed, { uri: 'haiccing/base-docs-hdlc/validation' })).includes('<h1>Validation</h1><p class="from">in haiccing/base-docs-hdlc</p>'), 'read in a package\'s context: its package said, the page\'s frame')
   await t.exception(page(exec, { uri: '', query: { at: '../x' } }), /not an mrepo's position/)
+  // the docs mrepo by its unique URI: wherever the server finds it
+  const bench = execution({ 'workbench/docs info/get': { keyword: '.', choices: [{ title: 'base-component-docs', page: '# docs', below: [] }] } }, { docs: 'workbench/docs' })
+  const there = await page(bench, { uri: '' })
+  t.alike(bench.asked[0], ['workbench/docs', 'info/get'], 'below a solution: asked at its position there, as the server found it')
+  t.ok(there.includes('<footer><code>haicc workbench/docs info/get</code></footer>'), 'the command it shows: its position, a command a terminal runs')
+  const lost = await page(execution({}, { docs: new Error('no mrepo local/docs in the install\'s registry') }), { uri: '' })
+  t.ok(lost.includes('the docs mrepo, local/docs: no mrepo local/docs in the install&#39;s registry'), 'no docs mrepo in the install: said on the page')
 })
 
 // The component's Splectral side as splectral/install leaves it.
@@ -200,6 +209,7 @@ test('render: a page asked in the inbox, the mrepos and its data asked through t
       rmSync(join(outbox, name))
       seen.push({ ...form, topic: asked.value.topic })
       if (form.request === 'mrepos') put(inbox, asked.key, envelope(asked.key, { ...form, output: { version, mrepos: [{ at: '.', depth: 0 }, { at: 'docs', depth: 1 }] } }))
+      else if (form.request === 'mrepo') put(inbox, asked.key, envelope(asked.key, { ...form, output: { uri: form.uri, position: 'docs' } }))
       else if (form.raw) put(inbox, asked.key, envelope(asked.key, { ...form, output: { keyword: 'hdlc' }, record: '{"value":{"value":{"output":{"keyword":"hdlc"}}}}\n' }))
       else put(inbox, asked.key, envelope(asked.key, { ...form, output: { keyword: form.command[1] ?? '.', choices: [{ title: form.command[1] ?? 'top', page: 'How work is done.' }] } }))
     }
@@ -211,7 +221,8 @@ test('render: a page asked in the inbox, the mrepos and its data asked through t
     t.ok(done, 'the page answered under its own key')
     t.absent(existsSync(join(inbox, `${key}.json`)), 'the page request taken from the inbox')
     const asked = seen.map(f => f.request === 'data' ? [f.request, f.at, ...f.command].join(' ') : f.request)
-    t.alike([asked[0], ...asked.slice(1).sort()], ['mrepos', 'data docs info/get', 'data docs info/get hdlc'], 'the mrepos first; then the data the page needs, asked at once: a command at a position, this page\'s and the level above')
+    t.alike([asked[0], asked[1], ...asked.slice(2).sort()], ['mrepos', 'mrepo', 'data docs info/get', 'data docs info/get hdlc'], 'the mrepos first; then where the docs mrepo is, by its unique URI (the server finds it); then the data the page needs, asked at once: a command at its position, this page\'s and the level above')
+    t.is(seen.find(f => f.request === 'mrepo').uri, 'local/docs', 'the docs mrepo asked by its unique URI')
     t.ok(seen.every(f => f.topic === '/local/help/splectral/inbox'), 'their answers to come back to its inbox')
     t.alike([done.request, done.path], ['page', 'hdlc'], 'the page request, completed')
     t.ok(done.output.includes('<h1>hdlc</h1><p>How work is done.</p>'), 'the page, drawn')
@@ -221,7 +232,7 @@ test('render: a page asked in the inbox, the mrepos and its data asked through t
     seen.length = 0
     version = 2
     await ask('44444444-4444-4444-8444-444444444444', 'hdlc')
-    t.alike(seen.map(f => f.request), ['mrepos', 'data', 'data'], 'the install changed (its version moved): asked again')
+    t.alike(seen.map(f => f.request), ['mrepos', 'mrepo', 'data', 'data'], 'the install changed (its version moved): asked again, where the docs mrepo is too')
     seen.length = 0
     const raw = await ask('55555555-5555-4555-8555-555555555555', 'hdlc', { raw: '' })
     t.ok(raw.output.includes('<pre class="raw">'), 'raw: the response printed')
@@ -259,6 +270,7 @@ test('render: help asked typed: its answer back from the server as AVRO, read as
       if (form.request === 'page') continue
       rmSync(join(outbox, name))
       if (form.request === 'mrepos') { put(inbox, asked.key, envelope(asked.key, { ...form, output: { version: 1, mrepos: [{ at: '.', depth: 0 }, { at: 'host', depth: 1 }] } })); continue }
+      if (form.request === 'mrepo') { put(inbox, asked.key, envelope(asked.key, { ...form, output: { uri: form.uri, position: 'docs' } })); continue }
       const output = form.command.includes('nope') ? { run: false, command: 'crud/read x --flags help nope', why: ['no flag: nope'] } : answer
       typedBox(installed).write(asked.key, envelope(asked.key, { ...form, output, record: '{}' }))
       files.push(readFileSync(join(inbox, `${asked.key}.avro`)))

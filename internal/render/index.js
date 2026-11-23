@@ -43,6 +43,18 @@ export function render ({ side, installed, timeout = 120, every = 2000 }) {
       if (done.output?.version !== version) { kept.clear(); version = done.output?.version ?? null }
       return done.output
     },
+    // An mrepo by its unique URI: its position from the root, as the
+    // server finds it in the install's registry (kept with the rest).
+    mrepo (uri) {
+      const id = JSON.stringify(['mrepo', uri])
+      if (!kept.has(id)) {
+        const answer = asked({ request: 'mrepo', uri }, `the mrepo ${uri}`).then(done => { if ('error' in done) throw new Error(done.error); return done.output })
+        kept.set(id, answer)
+        // catch: an error is not kept, asked again the next time (the page says it)
+        answer.catch(() => kept.delete(id))
+      }
+      return kept.get(id)
+    },
     data (at, command) {
       const id = JSON.stringify([at, command])
       if (!kept.has(id)) {
@@ -74,7 +86,7 @@ export function render ({ side, installed, timeout = 120, every = 2000 }) {
   const following = follow(join(side, 'inbox'), (envelope, file) => {
     rmSync(join(side, 'inbox', file), { force: true })
     const form = envelope?.value?.value
-    if ((form?.request === 'data' || form?.request === 'mrepos') && completed(form)) return pending.get(envelope.key)?.(form)
+    if ((form?.request === 'data' || form?.request === 'mrepos' || form?.request === 'mrepo') && completed(form)) return pending.get(envelope.key)?.(form)
     if (form?.request !== 'page' || completed(form)) return
     const exec = execution()
     const started = Date.now()

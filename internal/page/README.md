@@ -6,12 +6,15 @@ Made by the component's program for every page the browser asks of it:
 the path below the component the keywords, as the command line has
 them. `/help/haiccing/base-docs-hdlc/validation` is `haicc docs info/get haiccing/base-docs-hdlc/validation`,
 drawn. The docs mrepo is read unless another is asked for
-(`?at=host`, `?at=.` the root).
+(`?at=host`, `?at=.` the root): by its unique URI, `local/docs`; the
+server finds where it is (`docs`, `workbench/docs`), the page shows that
+position in its command.
 
 ## Signature
 
 `page(exec, { uri, query })`: `exec` what the program hands it (`render`):
-`mrepos()`, `data(at, command)`, `record(at, command)`, `typed(at,
+`mrepos()`, `mrepo(uri)` (where an mrepo is, by its unique URI),
+`data(at, command)`, `record(at, command)`, `typed(at,
 command, as)` and `log(level,
 event, data)`.
 
@@ -19,7 +22,8 @@ event, data)`.
 
 - `uri`: the keywords, the path below the component; none: the top.
 - `query.at`: the mrepo read, by its position from the root (`.` the
-  root itself); `docs` by default.
+  root itself); the docs mrepo by default, wherever it is. Not found in
+  the install: said on the page.
 - `query.raw`: there (`?raw`): the command's response whole, as the
   terminal prints it.
 - `query.cmd`: a command as typed after `haicc` (`?cmd=host crud/read
@@ -90,4 +94,4 @@ the response printed; the command it shows, at the end.
 
 ## Also exported
 
-`DEFAULT`: `docs`. `WIDTH`: 80.
+`DOCS`: `local/docs`, the docs mrepo's unique URI. `WIDTH`: 80.
